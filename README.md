@@ -8,7 +8,7 @@
 * Mingi Jeong
 * Alberto Quattrini Li
 
-<img src="./imgs/demo.gif" width="500">
+<img src="./imgs/demo.gif" width="800">
 
 
 ## Tested Environment & Dependencies
@@ -18,8 +18,6 @@
 For a description of Python dependencies, please see the `pyproject.toml` file.
 
 Dependencies are managed using [poetry](https://python-poetry.org/). You will need to install poetry, see these [instructions](https://python-poetry.org/docs/), we used `poetry==1.6.1`.
-
-<img src="./imgs/overall.png" width="500">
 
 
 
@@ -81,4 +79,5 @@ python 5_train.py --parquet-path-train ./datasets/preprocessed_train_dataset.par
 python 6_eval.py # evaluate results
 ```
 
+<img src="./imgs/overall.png" width="500">
 <img src="./imgs/architecture.png" width="500">
