@@ -1,9 +1,9 @@
 # Neural Network Training for Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters Paper
 
 * This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: left or right to your vessel as well as data generator including real-world AIS / synthetic traffic.
-* Submitted to `ICRA 2024`
+* Submitted to `ICRA 2024` by Dartmouth Robotics
 
-## Contributor
+## Contributors
 * Ari Chadda
 * Mingi Jeong
 * Alberto Quattrini Li
