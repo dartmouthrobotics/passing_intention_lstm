@@ -6,7 +6,7 @@ import torchmetrics
 dataset_ = __import__("3_dataset")
 model_ = __import__("4_model")
 
-MODEL_PATH = "/home/arichadda/modeling/passing_intention/passing_intention_model_training/1694167331/best.pt"
+MODEL_PATH = "./weights/best.pt"
 TRAIN_PARQUET_PATH = "./datasets/preprocessed_train_dataset.parquet"
 TEST_PARQUET_PATH = "./datasets/preprocessed_test_dataset.parquet"
 

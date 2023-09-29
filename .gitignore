@@ -66,3 +66,6 @@ CATKIN_IGNORE
 # weight file
 *.pth
 *.zip
+
+# jupyter
+.ipynb_checkpoints/

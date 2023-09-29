@@ -18,8 +18,8 @@ class TimeSeriesClassifier(nn.Module):
 
     def forward(self, x):
         self.lstm.flatten_parameters()
-        _, (hidden, _) = self.lstm(x)
-        x = self.classifier(hidden[-1])
+        _output, (hidden_n, _cell_state_n) = self.lstm(x)
+        x = self.classifier(hidden_n[-1])
         x = self.sigmoid(x)
         return x
 

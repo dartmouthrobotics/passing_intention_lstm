@@ -56,12 +56,12 @@ class PassingIntentionDataset(Dataset):
 
 
 if __name__ == "__main__":
-    ### USAGE
+    ### Usage example
     TRAIN_PARQUET_PATH = (
-        "/home/ari/Development/passing_intention/ari/preprocessed_train_dataset.parquet"
+        "./datasets/preprocessed_train_dataset.parquet"
     )
     TEST_PARQUET_PATH = (
-        "/home/ari/Development/passing_intention/ari/preprocessed_test_dataset.parquet"
+        "./datasets/preprocessed_test_dataset.parquet"
     )
 
     row_dim = max(

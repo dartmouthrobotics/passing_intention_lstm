@@ -6,7 +6,7 @@ from aux_code.learning_preprocess import get_trajectory_before_pass
 
 np.random.seed(0)
 
-DATASET_ROOT = "/home/arichadda/modeling/passing_intention/datasets"
+DATASET_ROOT = "./datasets"
 FULL_DATASET_PARQUET_PATH = os.path.join(
     DATASET_ROOT, "preprocessed_full_dataset.parquet"
 )
@@ -36,23 +36,15 @@ test_obj_id = np.setdiff1d(unique_id, train_obj_id)
 train_obj_id
 
 df_cropped_train = get_trajectory_before_pass(df_entire_pass, train_obj_id)
-# df_cropped_train = df_cropped_train[
-#     df_cropped_train["Heading_by_xy"].notna()
-# ]  # drop na for Heaing_by_xy
 
 assert np.all(df_cropped_train["label"])
 assert not np.any(np.isnan(df_cropped_train["y"]))
-# assert not np.any(np.isnan(df_cropped_train["Heading_by_xy"]))
 
 df_cropped_train.to_parquet(OUT_TRAIN_DATASET_PARQUET_PATH)
 
 df_cropped_test = get_trajectory_before_pass(df_entire_pass, test_obj_id)
-# df_cropped_test = df_cropped_test[
-#     df_cropped_test["Heading_by_xy"].notna()
-# ]  # drop na for Heaing_by_xy
 
 assert np.all(df_cropped_test["label"])
 assert not np.any(np.isnan(df_cropped_test["y"]))
-# assert not np.any(np.isnan(df_cropped_test["Heading_by_xy"]))
 
 df_cropped_test.to_parquet(OUT_TEST_DATASET_PARQUET_PATH)

@@ -4,18 +4,18 @@ import pandas as pd
 from math import sin, cos
 from aux_code.learning_preprocess import convert_from_NED_to_Robotic
 
-REAL_DATA_ROOT = "/home/arichadda/modeling/passing_intention/datasets/extracted_data/ahead_major"
+REAL_DATA_ROOT = "./datasets/extracted_data/ahead_major"
 REAL_FILE_PREFIX = "aisdk"
 
 SYNTHETIC_DATA_ROOT = (
-    "/home/arichadda/modeling/passing_intention/datasets/synthetic_data_bak/"
+    "./datasets/synthetic_data_bak/"
 )
 SYNTHETIC_DATA_NOISE_PATH = os.path.join(SYNTHETIC_DATA_ROOT, "noise")
 SYNTHETIC_DATA_NO_NOISE_PATH = os.path.join(SYNTHETIC_DATA_ROOT, "no_noise")
 
 SYNTHETIC_FILE_PREFIX = "synthetic"
 
-OUT_PATH = "/home/arichadda/modeling/passing_intention/datasets/preprocessed_full_dataset.parquet"
+OUT_PATH = "./datasets/preprocessed_full_dataset.parquet"
 
 
 def load_pkl_to_df(pkl_dir_path: str, pkl_file_prefix: str) -> pd.DataFrame:
@@ -65,24 +65,11 @@ df_entire_pass = real_df_entire_pass.reset_index()
 synthetic_noise_df["obj_index"] = synthetic_noise_df["obj_index"] + 200
 synthetic_no_noise_df["obj_index"] = synthetic_no_noise_df["obj_index"] + 300
 df_entire_pass = pd.concat([df_entire_pass, synthetic_noise_df, synthetic_no_noise_df])
-# df_entire_pass = pd.concat([synthetic_noise_df, synthetic_no_noise_df])
 df_entire_pass = df_entire_pass.reset_index()
 
 assert len(df_entire_pass.groupby("obj_index")) == 400
 assert len(df_entire_pass) == len(real_df_entire_pass) + len(synthetic_noise_df) + len(
     synthetic_no_noise_df
 )
-
-### Normalize big #'s by dividing by 100
-# df_entire_pass[
-#     [
-#         "x",
-#         "y",
-#         "rel_dist",
-#     ]
-# ] = df_entire_pass[
-#     ["x", "y", "rel_dist"]
-# ].div(100)
-
 
 df_entire_pass.to_parquet(OUT_PATH)
