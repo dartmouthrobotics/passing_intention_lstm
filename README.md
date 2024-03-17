@@ -1,15 +1,25 @@
 # Neural Network Training for Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters Paper
 
+<p align="center">
+    <img src="./imgs/fig2-system-architecture.png" width="600">
+</p>
+
 * This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: left or right to your vessel as well as data generator including real-world AIS / synthetic traffic.
-* Submitted to `ICRA 2024` by Dartmouth Robotics
+* Submitted to `IROS 2024` by Dartmouth Robotics
 
 ## Contributors
 * Ari Chadda
 * Mingi Jeong
 * Alberto Quattrini Li
 
-<img src="./imgs/demo.gif" width="800">
 
+## Successfully Real-World Deployed on an ASV
+<p align="center">
+    <img src="./imgs/catabot-drone2-w-shore.png" width=600/>
+<img src="./imgs/config_far.png" width=600/>
+</p>
+
+Real-world experiment with our custom ASV catabot in operation and experimental location with 4 obstacles, where the ASV successfully navigates this scenario using the proposed method.
 
 ## Tested Environment & Dependencies
 * Ubuntu 20.04
@@ -79,5 +89,16 @@ python 5_train.py --parquet-path-train ./datasets/preprocessed_train_dataset.par
 python 6_eval.py # evaluate results
 ```
 
-<img src="./imgs/overall.png" width="500">
-<img src="./imgs/architecture.png" width="500">
+## Overall Methodology
+
+### Prior State of the Art
+<p align="center">
+    <img src="./imgs/new-beauty-state-of-the-art.png" width="600">
+</p>
+
+### Proposed Method
+<p align="center">
+    <img src="./imgs/new-beauty-ours.png" width="600">
+</p>
+
+From time $t$ to $t+1$, controlled ASV, $R$'s collision avoidance behavior by state-of-the-art method vs.\ proposed method using active learning-augmented intent-awareness under an uncertain scenario where an obstacle, $O$ approaches from the left side of $R$: (\textbf{a}) At $t$, the state-of-the-art, lacking intent-awareness, predicts that O will pass on the left side (red) of $R$ and thus $R$ maintains its course as a \textit{stand-on} vessel. At $t+1$, $R$ realizes $O$ is attempting to pass on the right side (green) of $R$, resulting in a nearmiss. $R$ did a hard turn-over but it is too late. (\textbf{b}) At $t$, our method classifies the topological passing side based on the historical data from $t_h$ to $t$ and actively determines an action to increase information gain, i.e., to decrease the probability of passing on the right side (green), which is risky due to bow crossing. This proactive action with \textit{good seamanship} despite a \textit{stand-on} status leads to a safe clearance at $t+1$.
