@@ -15,8 +15,10 @@
 
 ## Successfully Real-World Deployed on an ASV
 <p align="center">
-    <img src="./imgs/catabot-drone2-w-shore.png" width=600/>
+    <img src="./imgs/dji-bev.gif" width=600/>
+    <!-- <img src="./imgs/catabot-drone2-w-shore.png" width=600/> -->
 <img src="./imgs/config_far.png" width=600/>
+<img src="./imgs/config_close.png" width=600/>
 </p>
 
 Real-world experiment with our custom ASV catabot in operation and experimental location with 4 obstacles, where the ASV successfully navigates this scenario using the proposed method.
