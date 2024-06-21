@@ -1,0 +1,64 @@
+import os
+import pandas as pd
+import numpy as np
+from aux_code.learning_preprocess import get_trajectory_before_pass
+
+
+np.random.seed(0)
+
+DATASET_ROOT = "./datasets"
+FULL_DATASET_PARQUET_PATH = os.path.join(
+    DATASET_ROOT, "preprocessed_full_dataset.parquet"
+)
+
+OUT_TRAIN_DATASET_PARQUET_PATH = os.path.join(
+    DATASET_ROOT, "preprocessed_train_dataset.parquet"
+)
+OUT_VAL_DATASET_PARQUET_PATH = os.path.join(
+    DATASET_ROOT, "preprocessed_val_dataset.parquet"
+)
+OUT_TEST_DATASET_PARQUET_PATH = os.path.join(
+    DATASET_ROOT, "preprocessed_test_dataset.parquet"
+)
+
+df_entire_pass = pd.read_parquet(FULL_DATASET_PARQUET_PATH)
+
+# https://www.geeksforgeeks.org/how-to-randomly-select-elements-of-an-array-with-numpy-in-python/
+
+# for train, val, test data
+use_df = df_entire_pass.loc[(df_entire_pass.valid == True)]  # to be used, valid df
+unique_id = use_df.obj_index.unique()
+
+# data split
+train_data_size = int(len(unique_id) * 0.7)
+val_data_size = int(len(unique_id) * 0.2)
+test_data_size = len(unique_id) - train_data_size - val_data_size
+
+# split obj indexes
+train_obj_id = np.random.choice(unique_id, size=train_data_size, replace=False)
+remaining_obj_id = np.setdiff1d(unique_id, train_obj_id, assume_unique=True)
+val_obj_id = np.random.choice(remaining_obj_id, size=val_data_size, replace=False)
+test_obj_id = np.setdiff1d(remaining_obj_id, val_obj_id, assume_unique=True)
+
+df_cropped_train = get_trajectory_before_pass(df_entire_pass, train_obj_id)
+
+assert np.all(df_cropped_train["label"])
+assert not np.any(np.isnan(df_cropped_train["y"]))
+
+df_cropped_train.to_parquet(OUT_TRAIN_DATASET_PARQUET_PATH)
+
+
+df_cropped_val = get_trajectory_before_pass(df_entire_pass, val_obj_id)
+
+assert np.all(df_cropped_val["label"])
+assert not np.any(np.isnan(df_cropped_val["y"]))
+
+df_cropped_val.to_parquet(OUT_VAL_DATASET_PARQUET_PATH)
+
+
+df_cropped_test = get_trajectory_before_pass(df_entire_pass, test_obj_id)
+
+assert np.all(df_cropped_test["label"])
+assert not np.any(np.isnan(df_cropped_test["y"]))
+
+df_cropped_test.to_parquet(OUT_TEST_DATASET_PARQUET_PATH)
