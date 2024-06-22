@@ -69,3 +69,8 @@ CATKIN_IGNORE
 
 # jupyter
 .ipynb_checkpoints/
+
+# training 
+weights/
+*.log
+test.py

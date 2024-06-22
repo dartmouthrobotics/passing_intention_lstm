@@ -530,7 +530,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "ray"
-version = "2.24.0"
+version = "2.30.0"
 description = "Ray provides a simple, universal API for building distributed applications."
 category = "main"
 optional = false
@@ -541,28 +541,24 @@ aiosignal = "*"
 click = ">=7.0"
 filelock = "*"
 frozenlist = "*"
-fsspec = {version = "*", optional = true, markers = "extra == \"tune\""}
 jsonschema = "*"
 msgpack = ">=1.0.0,<2.0.0"
 packaging = "*"
-pandas = {version = "*", optional = true, markers = "extra == \"tune\""}
 protobuf = ">=3.15.3,<3.19.5 || >3.19.5"
-pyarrow = {version = ">=6.0.1", optional = true, markers = "extra == \"tune\""}
 pyyaml = "*"
 requests = "*"
-tensorboardX = {version = ">=1.9", optional = true, markers = "extra == \"tune\""}
 
 [package.extras]
-air = ["watchfiles", "pydantic (<2.0.0 || >=2.5.0,<3)", "colorful", "uvicorn", "requests", "pyarrow (>=6.0.1)", "aiohttp (>=3.7)", "pandas (>=1.3)", "py-spy (>=0.2.0)", "pandas", "starlette", "tensorboardX (>=1.9)", "fsspec", "virtualenv (>=20.0.24,!=20.21.1)", "fastapi", "numpy (>=1.20)", "prometheus-client (>=0.7.1)", "opencensus", "aiohttp-cors", "smart-open", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
-all = ["ray-cpp (==2.24.0)", "pydantic (<2.0.0 || >=2.5.0,<3)", "watchfiles", "colorful", "grpcio (!=1.56.0)", "uvicorn", "requests", "pyarrow (>=6.0.1)", "aiohttp (>=3.7)", "pandas (>=1.3)", "opentelemetry-exporter-otlp", "gymnasium (==0.28.1)", "py-spy (>=0.2.0)", "typer", "scipy", "pandas", "rich", "starlette", "tensorboardX (>=1.9)", "fsspec", "opentelemetry-sdk", "virtualenv (>=20.0.24,!=20.21.1)", "fastapi", "opentelemetry-api", "dm-tree", "scikit-image", "lz4", "pyyaml", "numpy (>=1.20)", "prometheus-client (>=0.7.1)", "opencensus", "aiohttp-cors", "smart-open", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
+air = ["aiohttp-cors", "smart-open", "starlette", "pandas", "watchfiles", "prometheus-client (>=0.7.1)", "tensorboardX (>=1.9)", "opencensus", "pandas (>=1.3)", "requests", "numpy (>=1.20)", "virtualenv (>=20.0.24,!=20.21.1)", "pydantic (<2.0.0 || >=2.5.0,<3)", "pyarrow (>=6.0.1)", "colorful", "aiohttp (>=3.7)", "py-spy (>=0.2.0)", "uvicorn", "fastapi", "fsspec", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
+all = ["aiohttp-cors", "grpcio (!=1.56.0)", "smart-open", "starlette", "pandas", "prometheus-client (>=0.7.1)", "watchfiles", "scikit-image", "tensorboardX (>=1.9)", "opencensus", "gymnasium (==0.28.1)", "pyyaml", "opentelemetry-exporter-otlp", "opentelemetry-api", "rich", "pandas (>=1.3)", "lz4", "requests", "numpy (>=1.20)", "opentelemetry-sdk", "virtualenv (>=20.0.24,!=20.21.1)", "pydantic (<2.0.0 || >=2.5.0,<3)", "pyarrow (>=6.0.1)", "colorful", "ray-cpp (==2.30.0)", "typer", "dm-tree", "aiohttp (>=3.7)", "py-spy (>=0.2.0)", "uvicorn", "scipy", "fastapi", "fsspec", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
 client = ["grpcio (!=1.56.0)"]
-cpp = ["ray-cpp (==2.24.0)"]
+cpp = ["ray-cpp (==2.30.0)"]
 data = ["numpy (>=1.20)", "pandas (>=1.3)", "pyarrow (>=6.0.1)", "fsspec"]
 default = ["aiohttp (>=3.7)", "aiohttp-cors", "colorful", "py-spy (>=0.2.0)", "requests", "opencensus", "pydantic (<2.0.0 || >=2.5.0,<3)", "prometheus-client (>=0.7.1)", "smart-open", "virtualenv (>=20.0.24,!=20.21.1)", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
 observability = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-otlp"]
 rllib = ["pandas", "tensorboardX (>=1.9)", "requests", "pyarrow (>=6.0.1)", "fsspec", "dm-tree", "gymnasium (==0.28.1)", "lz4", "scikit-image", "pyyaml", "scipy", "typer", "rich"]
-serve = ["watchfiles", "pydantic (<2.0.0 || >=2.5.0,<3)", "colorful", "uvicorn", "requests", "prometheus-client (>=0.7.1)", "virtualenv (>=20.0.24,!=20.21.1)", "starlette", "fastapi", "aiohttp (>=3.7)", "opencensus", "py-spy (>=0.2.0)", "aiohttp-cors", "smart-open", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
-serve-grpc = ["watchfiles", "pydantic (<2.0.0 || >=2.5.0,<3)", "colorful", "uvicorn", "requests", "prometheus-client (>=0.7.1)", "virtualenv (>=20.0.24,!=20.21.1)", "starlette", "fastapi", "aiohttp (>=3.7)", "aiohttp-cors", "opencensus", "py-spy (>=0.2.0)", "smart-open", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
+serve = ["aiohttp-cors", "smart-open", "starlette", "py-spy (>=0.2.0)", "opencensus", "requests", "watchfiles", "pydantic (<2.0.0 || >=2.5.0,<3)", "colorful", "prometheus-client (>=0.7.1)", "virtualenv (>=20.0.24,!=20.21.1)", "fastapi", "aiohttp (>=3.7)", "uvicorn", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
+serve-grpc = ["aiohttp-cors", "smart-open", "starlette", "opencensus", "requests", "watchfiles", "pydantic (<2.0.0 || >=2.5.0,<3)", "colorful", "prometheus-client (>=0.7.1)", "virtualenv (>=20.0.24,!=20.21.1)", "fastapi", "uvicorn", "aiohttp (>=3.7)", "py-spy (>=0.2.0)", "grpcio (>=1.32.0)", "grpcio (>=1.42.0)", "memray"]
 train = ["pandas", "tensorboardX (>=1.9)", "requests", "pyarrow (>=6.0.1)", "fsspec"]
 tune = ["pandas", "tensorboardX (>=1.9)", "requests", "pyarrow (>=6.0.1)", "fsspec"]
 
@@ -859,7 +855,7 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "9619069402b8f5b1aea161331eaf8a82deb5b90c8dd7cbfbe0f37fad46646fb8"
+content-hash = "715b539f6b12a7c7bc40e98e86384f1498a89b955977944822145e0bce61144c"
 
 [metadata.files]
 absl-py = []

@@ -2,7 +2,14 @@ import torch.nn as nn
 
 
 class TimeSeriesClassifier(nn.Module):
-    def __init__(self, num_features, num_classes, hidden_size=256, num_layers=3):
+    def __init__(
+        self,
+        num_features,
+        num_classes,
+        hidden_size=256,
+        num_layers=3,
+        dropout_fraction=0.4,
+    ):
         super().__init__()
 
         self.lstm = nn.LSTM(
@@ -10,7 +17,7 @@ class TimeSeriesClassifier(nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
-            dropout=0.4,
+            dropout=dropout_fraction,
         )
 
         self.classifier = nn.Linear(in_features=hidden_size, out_features=num_classes)
