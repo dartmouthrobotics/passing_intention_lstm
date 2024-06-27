@@ -22,7 +22,7 @@ import torchmetrics
 import torch.nn as nn
 import torch.optim as optim
 
-import tempfile
+from torch.utils.tensorboard import SummaryWriter
 from ray import tune, train
 from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
@@ -50,10 +50,10 @@ def parse_cli() -> argparse.Namespace:
         help="path to directory of train data assets",
     )
     parser.add_argument(
-        "--parquet-path-test",
+        "--parquet-path-val",
         type=str,
         default="",
-        help="path to directory of test data assets",
+        help="path to directory of validation data assets",
     )
     parser.add_argument(
         "--out-dir",
@@ -131,6 +131,7 @@ def train_epoch(
     loss_func: nn.CrossEntropyLoss,
     optimizer: optim.Adam,
     epoch: int,
+    tensorboard_writer: SummaryWriter,
     device: str,
 ) -> npt.NDArray[np.float32]:
     """implements within-epoch training step
@@ -150,7 +151,7 @@ def train_epoch(
     model.train()
     loss_ls = []
     # load feature-label pairs into memory
-    for X, y, l in train_data_loader:
+    for X, y, l in tqdm(train_data_loader, colour="green"):
         # send to GPU
         # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
@@ -167,22 +168,25 @@ def train_epoch(
         # save loss for logging
         loss = loss.mean()
         loss_ls.append(loss.item())
-    return np.vstack(loss_ls).mean()
+    agg_loss = np.vstack(loss_ls).mean()
+    tensorboard_writer.add_scalar("Loss/train", agg_loss, epoch)
+    return agg_loss
 
 
 @torch.no_grad()
 def eval_func(
-    test_data_loader: DataLoader[Any],
+    val_data_loader: DataLoader[Any],
     model: nn.Module,
     loss_func: nn.CrossEntropyLoss,
     metric_func: torchmetrics.F1Score,
     epoch: int,
+    tensorboard_writer: SummaryWriter, 
     device: str,
 ) -> Tuple[Union[int, float], Any]:
     """implements within-epoch evaluation
 
     Args:
-        test_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up test feature-label pairs
+        val_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up validation feature-label pairs
         model (torchvision.models.resnet18): ResNet-18 model for training
         loss_func (torch.nn.CrossEntropyLoss): torch loss function for dictating loss landscape and location within it
         metric_func (torchmetrics.F1Score): metric function to judge training task performance
@@ -199,7 +203,7 @@ def eval_func(
     gt = []
     loss_ls = []
     # load feature-label pairs into memory
-    for X, y, l in test_data_loader:
+    for X, y, l in tqdm(val_data_loader, colour="red"):
         # send to GPU
         # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
@@ -218,12 +222,15 @@ def eval_func(
     # compute task performace metric
     metric = metric_func(torch.cat(preds), torch.cat(gt))
     # log task performance metric
-    return torch.vstack(loss_ls).mean().item(), metric
+    agg_loss = torch.vstack(loss_ls).mean().item()
+    tensorboard_writer.add_scalar("Loss/val", agg_loss, epoch)
+    tensorboard_writer.add_scalar("F1/val", metric, epoch)
+    return agg_loss, metric
 
 
 def train_loop(
     train_data_loader: DataLoader[Any],
-    test_data_loader: DataLoader[Any],
+    val_data_loader: DataLoader[Any],
     epochs: int,
     model: nn.Module,
     loss_func: nn.CrossEntropyLoss,
@@ -237,7 +244,7 @@ def train_loop(
 
     Args:
         train_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up training feature-label pairs
-        test_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up test feature-label pairs
+        val_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up validation feature-label pairs
         epochs (int): number of epochs to train for
         model (torchvision.models.resnet18): ResNet-18 model for training
         loss_func (torch.nn.CrossEntropyLoss): torch loss function for dictating loss landscape and location within it
@@ -249,8 +256,9 @@ def train_loop(
     """
     # C-style find minimum initalization
     best_loss = np.float32(sys.maxsize)
+    tensorboard_writer = SummaryWriter()
     # epoch training + evaluation
-    for epoch in tqdm(range(epochs)):
+    for epoch in tqdm(range(epochs), colour="orange"):
         start_time = time()
         # execute epoch training
         train_loss = train_epoch(
@@ -259,15 +267,17 @@ def train_loop(
             loss_func,
             optimizer,
             epoch,
+            tensorboard_writer,
             device,
         )
         # execute epoch evaluation
         eval_loss, eval_metric = eval_func(
-            test_data_loader,
+            val_data_loader,
             model,
             loss_func,
             metric_func,
             epoch,
+            tensorboard_writer,
             device,
         )
 
@@ -294,7 +304,7 @@ def train_loop(
             }
             torch.save(best_dict, os.path.join(out_dir, "best.pt"))
 
-        # log some informaiton to the console
+        # log some information to the console
         print(
             "Epoch #",
             epoch,
@@ -327,7 +337,7 @@ def training_wrapper(search_space):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     row_dim = max(
-        pd.read_parquet(args.parquet_path_test).groupby("obj_index").size().max(),
+        pd.read_parquet(args.parquet_path_val).groupby("obj_index").size().max(),
         pd.read_parquet(args.parquet_path_train).groupby("obj_index").size().max(),
     )
 
@@ -340,8 +350,8 @@ def training_wrapper(search_space):
         num_workers=args.num_workers,
     )
 
-    test_data_loader = create_data_loader(
-        parquet_path=args.parquet_path_test,
+    val_data_loader = create_data_loader(
+        parquet_path=args.parquet_path_val,
         row_dim=row_dim,
         batch_size=search_space["batch_size"],
         is_training=args.is_training,
@@ -350,7 +360,7 @@ def training_wrapper(search_space):
 
     # log size to console
     print("TRAIN DATALOADER LENGTH:", len(train_data_loader))
-    print("TEST DATALOADER LENGTH:", len(test_data_loader))
+    print("VAL DATALOADER LENGTH:", len(val_data_loader))
 
     model = model_file.TimeSeriesClassifier(
         num_features=6,
@@ -378,7 +388,7 @@ def training_wrapper(search_space):
 
     train_loop(
         train_data_loader,
-        test_data_loader,
+        val_data_loader,
         args.epochs,
         model,
         loss_func,
@@ -405,23 +415,32 @@ if __name__ == "__main__":
     #     "dropout": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5]),
     # }
 
+    # search_space = {
+    #     "learning_rate": tune.grid_search([1e-3, 1e-2, 1e-1]),
+    #     "weight_decay": tune.choice([1e-5]),
+    #     "batch_size": tune.grid_search([32]),
+    #     "hidden_size": tune.grid_search([128, 256, 512]),
+    #     "num_layers": tune.grid_search([2, 3]),
+    #     "dropout": tune.choice([0.3, 0.4, 0.5, 0.6]),
+    # }
+
     search_space = {
-        "learning_rate": tune.grid_search([1e-3, 1e-2, 1e-1]),
+        "learning_rate": tune.grid_search([1e-3, 1e-2]),
         "weight_decay": tune.choice([1e-5]),
         "batch_size": tune.grid_search([32]),
-        "hidden_size": tune.grid_search([128, 256, 512]),
+        "hidden_size": tune.grid_search([128, 256]),
         "num_layers": tune.grid_search([2, 3]),
-        "dropout": tune.choice([0.4]),
+        "dropout": tune.choice([0.5]),
     }
 
     os.makedirs(args.out_dir, exist_ok=True)
 
     torch.manual_seed(1)
     
-    # trainable_with_resources = tune.with_resources(training_wrapper, {"cpu": 10,})
+    trainable_with_resources = tune.with_resources(training_wrapper, {"cpu": 18,})
     # execute training
     tuner = tune.Tuner(
-        trainable=training_wrapper,
+        trainable=trainable_with_resources,
         run_config=train.RunConfig(
             name=f"lstm_classifier_training_{str(time()).split('.')[0]}",
             storage_path=args.out_dir,
@@ -434,7 +453,7 @@ if __name__ == "__main__":
         ),
         tune_config=tune.TuneConfig(
             num_samples=1,
-            max_concurrent_trials=18,
+            max_concurrent_trials=1,
             scheduler=ASHAScheduler(metric="eval_metric", mode="max"),
         ),
         
