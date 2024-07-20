@@ -21,11 +21,13 @@ import pandas as pd
 import torchmetrics
 import torch.nn as nn
 import torch.optim as optim
+from torch.nn.utils.rnn import pack_padded_sequence
 
 from torch.utils.tensorboard import SummaryWriter
 from ray import tune, train
 from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
+import tempfile
 
 # custom
 dataset = __import__("3_dataset")
@@ -71,7 +73,6 @@ def parse_cli() -> argparse.Namespace:
     )
     parser.add_argument(
         "--is-training",
-        type=bool,
         default=False,
         help="True if running not inference, else False",
     )
@@ -153,7 +154,7 @@ def train_epoch(
     # load feature-label pairs into memory
     for X, y, l in tqdm(train_data_loader, colour="green"):
         # send to GPU
-        # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
+        X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
         # reset gradients
         optimizer.zero_grad()
@@ -205,7 +206,7 @@ def eval_func(
     # load feature-label pairs into memory
     for X, y, l in tqdm(val_data_loader, colour="red"):
         # send to GPU
-        # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
+        X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
         # get model guess
         logits = model(X)
@@ -258,7 +259,7 @@ def train_loop(
     best_loss = np.float32(sys.maxsize)
     tensorboard_writer = SummaryWriter()
     # epoch training + evaluation
-    for epoch in tqdm(range(epochs), colour="orange"):
+    for epoch in tqdm(range(epochs), colour="magenta"):
         start_time = time()
         # execute epoch training
         train_loss = train_epoch(
@@ -282,27 +283,37 @@ def train_loop(
         )
 
         # with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-            # checkpoint = None
-        torch.save(
-            model.state_dict(), os.path.join(out_dir, "model.pth")
-        )
-        checkpoint = Checkpoint.from_directory(out_dir)
+        #     if eval_loss < best_loss:
+        #         best_loss = eval_loss
+        #         checkpoint = None
+        #         torch.save(
+        #             model.state_dict(), os.path.join(temp_checkpoint_dir, "model.pth")
+        #         )
+        #         checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
+
+        if eval_loss < best_loss:
+            best_loss = eval_loss
+            checkpoint = None
+            torch.save(
+                model.state_dict(), os.path.join(out_dir, "model.pth")
+            )
+            checkpoint = Checkpoint.from_directory(out_dir)
 
         # Send the current training result back to Tune
         # step learning rate scheduler
         scheduler.step()
 
         # save model checkpoint if evaluation loss improves
-        if eval_loss < best_loss:
-            best_loss = eval_loss
-            best_dict = {
-                "epoch": epochs,
-                "train_loss": train_loss,
-                "eval_loss": eval_loss,
-                "eval_metric": eval_metric.item(),
-                "model_state_dict": model.state_dict(),
-            }
-            torch.save(best_dict, os.path.join(out_dir, "best.pt"))
+        # if eval_loss < best_loss:
+        #     best_loss = eval_loss
+        #     best_dict = {
+        #         "epoch": epochs,
+        #         "train_loss": train_loss,
+        #         "eval_loss": eval_loss,
+        #         "eval_metric": eval_metric.item(),
+        #         "model_state_dict": model.state_dict(),
+        #     }
+        #     torch.save(best_dict, os.path.join(out_dir, "best.pt"))
 
         # log some information to the console
         print(
@@ -319,9 +330,9 @@ def train_loop(
         print("Epoch Time:", str(time() - start_time))
 
         # manually save some information for posterity
-        save_stats(out_dir, float(train_loss), "train_loss.txt")
-        save_stats(out_dir, float(eval_loss), "eval_loss.txt")
-        save_stats(out_dir, float(eval_metric.item()), "eval_metric.txt")
+        # save_stats(out_dir, float(train_loss), "train_loss.txt")
+        # save_stats(out_dir, float(eval_loss), "eval_loss.txt")
+        # save_stats(out_dir, float(eval_metric.item()), "eval_metric.txt")
 
         train.report(
             {
@@ -415,35 +426,35 @@ if __name__ == "__main__":
     #     "dropout": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5]),
     # }
 
-    # search_space = {
-    #     "learning_rate": tune.grid_search([1e-3, 1e-2, 1e-1]),
-    #     "weight_decay": tune.choice([1e-5]),
-    #     "batch_size": tune.grid_search([32]),
-    #     "hidden_size": tune.grid_search([128, 256, 512]),
-    #     "num_layers": tune.grid_search([2, 3]),
-    #     "dropout": tune.choice([0.3, 0.4, 0.5, 0.6]),
-    # }
-
     search_space = {
-        "learning_rate": tune.grid_search([1e-3, 1e-2]),
+        "learning_rate": tune.grid_search([1e-3, 1e-2, 1e-1]),
         "weight_decay": tune.choice([1e-5]),
         "batch_size": tune.grid_search([32]),
-        "hidden_size": tune.grid_search([128, 256]),
+        "hidden_size": tune.grid_search([128, 256, 512]),
         "num_layers": tune.grid_search([2, 3]),
-        "dropout": tune.choice([0.5]),
+        "dropout": tune.choice([0.3, 0.4, 0.5, 0.6]),
     }
+
+    # search_space = {
+    #     "learning_rate": tune.grid_search([1e-3, 1e-2]),
+    #     "weight_decay": tune.choice([1e-5]),
+    #     "batch_size": tune.grid_search([32]),
+    #     "hidden_size": tune.grid_search([128, 256]),
+    #     "num_layers": tune.grid_search([2, 3]),
+    #     "dropout": tune.choice([0.5]),
+    # }
 
     os.makedirs(args.out_dir, exist_ok=True)
 
     torch.manual_seed(1)
     
-    trainable_with_resources = tune.with_resources(training_wrapper, {"cpu": 18,})
+    trainable_with_resources = tune.with_resources(training_wrapper, {"cpu": 8, "gpu": 1})
     # execute training
     tuner = tune.Tuner(
         trainable=trainable_with_resources,
         run_config=train.RunConfig(
-            name=f"lstm_classifier_training_{str(time()).split('.')[0]}",
-            storage_path=args.out_dir,
+            name=f"lstm_classifier_training",
+            # storage_path=args.out_dir,
             # callbacks=[],
             checkpoint_config=train.CheckpointConfig(
                 checkpoint_score_attribute="eval_metric",
@@ -462,7 +473,7 @@ if __name__ == "__main__":
 
     result = tuner.fit()
 
-    best_trial = result.get_best_trial("eval_metric", "max", "last")
+    best_trial = result.get_best_result("eval_metric", "max", "last")
     print("Best trial config: {}".format(best_trial.config))
     print("Best trial final validation loss: {}".format(best_trial.last_result["eval_loss"]))
     print("Best trial final validation accuracy: {}".format(best_trial.last_result["eval_metric"]))
