@@ -12,6 +12,7 @@ model_ = __import__("4_model")
 MODEL_PATH = "./weights/model.pth"
 TRAIN_PARQUET_PATH = "./datasets/preprocessed_train_dataset.parquet"
 TEST_PARQUET_PATH = "./datasets/preprocessed_test_dataset.parquet"
+PLOT_SAVE_PATH = "./imgs/conf_mat.png"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 metric_func = torchmetrics.F1Score(task="multiclass", num_classes=2)
@@ -60,4 +61,4 @@ with torch.no_grad():
 mat = confusion_matrix(gt, preds)
 disp = ConfusionMatrixDisplay(mat, display_labels=test_dataset.classes_dict)
 disp.plot()
-plt.savefig("mat.png")
+plt.savefig(PLOT_SAVE_PATH)
