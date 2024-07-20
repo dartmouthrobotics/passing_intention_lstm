@@ -64,13 +64,11 @@ CATKIN_IGNORE
 *csv
 
 # weight file
-*.pth
 *.zip
 
 # jupyter
 .ipynb_checkpoints/
 
 # training 
-weights/
 *.log
 test.py

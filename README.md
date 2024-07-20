@@ -5,7 +5,7 @@
 </p>
 
 * This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: left or right to your vessel as well as data generator including real-world AIS / synthetic traffic.
-* Submitted to `IROS 2024` by Dartmouth Robotics
+* Accepted to `IROS 2024` by Dartmouth Robotics (and non-archival presentation at ` MOOS-DAWG'24`)
 
 ## Contributors
 * Ari Chadda
@@ -47,6 +47,7 @@ Dependencies are managed using [poetry](https://python-poetry.org/). You will ne
 │   ├── extracted_data
 │   ├── preprocessed_full_dataset.parquet
 │   ├── preprocessed_test_dataset.parquet
+|   ├── preprocessed_val_dataset.parquet
 │   ├── preprocessed_train_dataset.parquet
 │   └── synthetic_data
 ├── notebooks
@@ -80,14 +81,18 @@ flowchart TD
     train(5_train.py) --> eval(6_eval.py)
 ```
 
-To run, please use the following commands from the root of this repository
+To run, please use the following commands from the root of this repository. You will need to replace `<HOME_ABSPATH>` with the absolute path to the directory for RayTune.
+
+After running training (`5_train.py`), use the RayTune table to select the best trial. The model weight checkpoints will live in the `<HOME_ABSPATH>/ray_results` directory in the trial ID directory.
+
+Then, replace the `MODEL_PATH` constant in the `6_eval.py` script and update the `TimeSeriesClassifier()` definition if appropriate. 
 
 ```bash
 poetry shell # create virtualenv
 poetry install # install project dependencies
 python 1_preprocessing.py # prepare data for training
 python 2_split.py # create train/test split
-python 5_train.py --parquet-path-train ./datasets/preprocessed_train_dataset.parquet --parquet-path-test ./datasets/preprocessed_test_dataset.parquet --learning-rate 1e-2 --num-workers 10 --is-training True --epochs 10000 --batch-size 20 # stopped at approx. 1000 epochs
+python python 5_train.py --parquet-path-train <HOME_ABSPATH>/passing_intention_lstm_private/datasets/preprocessed_train_dataset.parquet --parquet-path-val <HOME_ABSPATH>/passing_intention_lstm_private/datasets/preprocessed_val_dataset.parquet --out-dir <HOME_ABSPATH>/passing_intention_lstm_private/passing_intention_model_training/run_2/ --is-training True --num-workers 4 --epochs 500
 python 6_eval.py # evaluate results
 ```
 
@@ -103,4 +108,4 @@ python 6_eval.py # evaluate results
     <img src="./imgs/new-beauty-ours.png" width="600">
 </p>
 
-From time $t$ to $t+1$, controlled ASV, $R$'s collision avoidance behavior by state-of-the-art method vs.\ proposed method using active learning-augmented intent-awareness under an uncertain scenario where an obstacle, $O$ approaches from the left side of $R$: (\textbf{a}) At $t$, the state-of-the-art, lacking intent-awareness, predicts that O will pass on the left side (red) of $R$ and thus $R$ maintains its course as a \textit{stand-on} vessel. At $t+1$, $R$ realizes $O$ is attempting to pass on the right side (green) of $R$, resulting in a nearmiss. $R$ did a hard turn-over but it is too late. (\textbf{b}) At $t$, our method classifies the topological passing side based on the historical data from $t_h$ to $t$ and actively determines an action to increase information gain, i.e., to decrease the probability of passing on the right side (green), which is risky due to bow crossing. This proactive action with \textit{good seamanship} despite a \textit{stand-on} status leads to a safe clearance at $t+1$.
+From time $t$ to $t+1$, controlled ASV, $R$'s collision avoidance behavior by state-of-the-art method vs.\ proposed method using active learning-augmented intent-awareness under an uncertain scenario where an obstacle, $O$ approaches from the left side of $R$: (**a**) At $t$, the state-of-the-art, lacking intent-awareness, predicts that O will pass on the left side (red) of $R$ and thus $R$ maintains its course as a *stand-on* vessel. At $t+1$, $R$ realizes $O$ is attempting to pass on the right side (green) of $R$, resulting in a nearmiss. $R$ did a hard turn-over but it is too late. (**b**) At $t$, our method classifies the topological passing side based on the historical data from $t_h$ to $t$ and actively determines an action to increase information gain, i.e., to decrease the probability of passing on the right side (green), which is risky due to bow crossing. This proactive action with *good seamanship* despite a *stand-on* status leads to a safe clearance at $t+1$.

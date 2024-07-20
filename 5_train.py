@@ -472,22 +472,3 @@ if __name__ == "__main__":
     )
 
     result = tuner.fit()
-
-    best_trial = result.get_best_result("eval_metric", "max", "last")
-    print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(best_trial.last_result["eval_loss"]))
-    print("Best trial final validation accuracy: {}".format(best_trial.last_result["eval_metric"]))
-
-    best_checkpoint = result.get_best_checkpoint(trial=best_trial, metric="eval_metric", mode="max")
-    best_checkpoint_dir = best_checkpoint.to_directory(path=args.out_dir)
-    # model_state, optimizer_state = torch.load(os.path.join(best_checkpoint_dir, "checkpoint"))
-    # best_trained_model = model._network
-    # best_trained_model.load_state_dict(model_state)
-    # model._network.load_state_dict(model_state)
-
-
-    # save final model checkpoint
-    # torch.save(
-    #     {"model_state_dict": model.state_dict()},
-    #     os.path.join(args.out_dir, "last.pt"),
-    # )
