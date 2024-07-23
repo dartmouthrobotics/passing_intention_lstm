@@ -9,7 +9,6 @@ import logging
 import wandb
 from time import time
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
 
 # data manipulation
 import numpy as np
@@ -17,28 +16,21 @@ import numpy.typing as npt
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
-from torch.nn.utils.rnn import pack_padded_sequence
 
 # modeling
 import torchmetrics
 import torch.nn as nn
 import torch.optim as optim
+from torch.nn.utils.rnn import pack_padded_sequence
+
+from torch.utils.tensorboard import SummaryWriter
+from ray import tune, train
+from ray.train import Checkpoint
+from ray.tune.schedulers import ASHAScheduler
 
 # custom
 dataset = __import__("3_dataset")
-model = __import__("4_model")
-
-
-def logging_config() -> SummaryWriter:
-    """initialize logging
-
-    Returns:
-        tensorboard.SummaryWriter: Tensorboard model training configuration
-    """
-    # initialize various logging classes
-    tensorboard_writer = SummaryWriter()
-    logging.basicConfig(filename="custom.log")
-    return tensorboard_writer
+model_file = __import__("4_model")
 
 
 def parse_cli() -> argparse.Namespace:
@@ -53,39 +45,24 @@ def parse_cli() -> argparse.Namespace:
         "--epochs", type=int, default=100, help="number of training epochs"
     )
     parser.add_argument(
-        "--batch-size", type=int, default=18, help="size of training batch"
-    )
-    parser.add_argument(
         "--parquet-path-train",
         type=str,
         default="",
         help="path to directory of train data assets",
     )
     parser.add_argument(
-        "--parquet-path-test",
+        "--parquet-path-val",
         type=str,
         default="",
-        help="path to directory of test data assets",
+        help="path to directory of validation data assets",
     )
     parser.add_argument(
         "--out-dir",
         type=str,
         default=os.path.join(
-            "passing_intention_model_training", str(time()).split(".")[0]
+            "passing_intention_model_training", str(time()).split(".")[0] + "/"
         ),
         help="default directory to save training outputs",
-    )
-    parser.add_argument(
-        "--learning-rate",
-        type=float,
-        default=1e-3,
-        help="learning rate step of optimizer",
-    )
-    parser.add_argument(
-        "--weight-decay",
-        type=float,
-        default=1e-3,
-        help="weight decay regularization of optimizer",
     )
     parser.add_argument(
         "--num-workers",
@@ -95,7 +72,6 @@ def parse_cli() -> argparse.Namespace:
     )
     parser.add_argument(
         "--is-training",
-        type=bool,
         default=False,
         help="True if running not inference, else False",
     )
@@ -154,8 +130,8 @@ def train_epoch(
     model: nn.Module,
     loss_func: nn.CrossEntropyLoss,
     optimizer: optim.Adam,
-    tensorboard_writer: SummaryWriter,
     epoch: int,
+    tensorboard_writer: SummaryWriter,
     device: str,
 ) -> npt.NDArray[np.float32]:
     """implements within-epoch training step
@@ -165,7 +141,6 @@ def train_epoch(
         model (torch.nn.Module): model for training
         loss_func (torch.nn.CrossEntropyLoss): torch loss function for dictating loss landscape and location within it
         optimizer (torch.optim.Adam): torch optimizer for dictating step size and direction in loss landscape
-        tensorboard_writer (tensorboard.SummaryWriter): logging and plotting various learning metrics
         epoch (int): epoch number for logging
         device (str): cuda, mps, or cpu
 
@@ -176,7 +151,7 @@ def train_epoch(
     model.train()
     loss_ls = []
     # load feature-label pairs into memory
-    for X, y, l in train_data_loader:
+    for X, y, l in tqdm(train_data_loader, colour="green"):
         # send to GPU
         X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
@@ -186,9 +161,6 @@ def train_epoch(
         logits = model(X)
         # evaluate loss + compute gradients
         loss = loss_func(logits, y)
-        # log loss value
-        tensorboard_writer.add_scalar("Loss/train", loss, epoch)
-        wandb.log({"Loss/train": loss})
         # backpropogate
         loss.backward()
         # step in computed direction + step size in loss landscape
@@ -196,27 +168,28 @@ def train_epoch(
         # save loss for logging
         loss = loss.mean()
         loss_ls.append(loss.item())
-    return np.vstack(loss_ls).mean()
+    agg_loss = np.vstack(loss_ls).mean()
+    tensorboard_writer.add_scalar("Loss/train", agg_loss, epoch)
+    return agg_loss
 
 
 @torch.no_grad()
 def eval_func(
-    test_data_loader: DataLoader[Any],
+    val_data_loader: DataLoader[Any],
     model: nn.Module,
     loss_func: nn.CrossEntropyLoss,
     metric_func: torchmetrics.F1Score,
-    tensorboard_writer: SummaryWriter,
     epoch: int,
+    tensorboard_writer: SummaryWriter, 
     device: str,
 ) -> Tuple[Union[int, float], Any]:
     """implements within-epoch evaluation
 
     Args:
-        test_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up test feature-label pairs
+        val_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up validation feature-label pairs
         model (torchvision.models.resnet18): ResNet-18 model for training
         loss_func (torch.nn.CrossEntropyLoss): torch loss function for dictating loss landscape and location within it
         metric_func (torchmetrics.F1Score): metric function to judge training task performance
-        tensorboard_writer (tensorboard.SummaryWriter): logging and plotting various learning metrics
         epoch (int): epoch number for logging
         device (str): cuda, mps, or cpu
 
@@ -230,7 +203,7 @@ def eval_func(
     gt = []
     loss_ls = []
     # load feature-label pairs into memory
-    for X, y, l in test_data_loader:
+    for X, y, l in tqdm(val_data_loader, colour="red"):
         # send to GPU
         X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
@@ -242,8 +215,6 @@ def eval_func(
         # compute evaluation loss to compare with training loss
         loss = loss_func(logits, y)
         # log loss value
-        tensorboard_writer.add_scalar("Loss/val", loss, epoch)
-        wandb.log({"Loss/val": loss})
         # save guesses and loss values
         loss_ls.append(loss)
         preds.append(preds_.type(torch.int16).cpu())
@@ -251,14 +222,15 @@ def eval_func(
     # compute task performace metric
     metric = metric_func(torch.cat(preds), torch.cat(gt))
     # log task performance metric
-    tensorboard_writer.add_scalar("Metric/f1", metric, epoch)
-    wandb.log({"Metric/f1": metric})
-    return torch.vstack(loss_ls).mean().item(), metric
+    agg_loss = torch.vstack(loss_ls).mean().item()
+    tensorboard_writer.add_scalar("Loss/val", agg_loss, epoch)
+    tensorboard_writer.add_scalar("F1/val", metric, epoch)
+    return agg_loss, metric
 
 
 def train_loop(
     train_data_loader: DataLoader[Any],
-    test_data_loader: DataLoader[Any],
+    val_data_loader: DataLoader[Any],
     epochs: int,
     model: nn.Module,
     loss_func: nn.CrossEntropyLoss,
@@ -266,14 +238,13 @@ def train_loop(
     out_dir: str,
     scheduler: optim.lr_scheduler.StepLR,
     metric_func: torchmetrics.F1Score,
-    tensorboard_writer: SummaryWriter,
     device: str,
-) -> Dict[str, Any]:
+) -> None:
     """model training driver function
 
     Args:
         train_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up training feature-label pairs
-        test_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up test feature-label pairs
+        val_data_loader (torch.utils.data.DataLoader): PyTorch DataLoader for serving up validation feature-label pairs
         epochs (int): number of epochs to train for
         model (torchvision.models.resnet18): ResNet-18 model for training
         loss_func (torch.nn.CrossEntropyLoss): torch loss function for dictating loss landscape and location within it
@@ -281,16 +252,13 @@ def train_loop(
         out_dir (str): file path to out directory to save model checkpoints and manual logs to
         scheduler (optim.lr_scheduler.StepLR): leanring rate scheduler to increment/decrement learning rate
         metric_func (torchmetrics.F1Score): metric function to judge training task performance
-        tensorboard_writer (tensorboard.SummaryWriter): logging and plotting various learning metrics
         device (str): cuda, mps, or cpu
-
-    Returns:
-        dict: dictionary of various final summary metrics
     """
     # C-style find minimum initalization
     best_loss = np.float32(sys.maxsize)
+    tensorboard_writer = SummaryWriter()
     # epoch training + evaluation
-    for epoch in tqdm(range(epochs)):
+    for epoch in tqdm(range(epochs), colour="magenta"):
         start_time = time()
         # execute epoch training
         train_loss = train_epoch(
@@ -298,36 +266,55 @@ def train_loop(
             model,
             loss_func,
             optimizer,
-            tensorboard_writer,
             epoch,
+            tensorboard_writer,
             device,
         )
         # execute epoch evaluation
         eval_loss, eval_metric = eval_func(
-            test_data_loader,
+            val_data_loader,
             model,
             loss_func,
             metric_func,
-            tensorboard_writer,
             epoch,
+            tensorboard_writer,
             device,
         )
+
+        # with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
+        #     if eval_loss < best_loss:
+        #         best_loss = eval_loss
+        #         checkpoint = None
+        #         torch.save(
+        #             model.state_dict(), os.path.join(temp_checkpoint_dir, "model.pth")
+        #         )
+        #         checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
+
+        if eval_loss < best_loss:
+            best_loss = eval_loss
+            checkpoint = None
+            torch.save(
+                model.state_dict(), os.path.join(out_dir, "model.pth")
+            )
+            checkpoint = Checkpoint.from_directory(out_dir)
+
+        # Send the current training result back to Tune
         # step learning rate scheduler
         scheduler.step()
 
         # save model checkpoint if evaluation loss improves
-        if eval_loss < best_loss:
-            best_loss = eval_loss
-            best_dict = {
-                "epoch": epochs,
-                "train_loss": train_loss,
-                "eval_loss": eval_loss,
-                "eval_metric": eval_metric.item(),
-                "model_state_dict": model.state_dict(),
-            }
-            torch.save(best_dict, os.path.join(out_dir, "best.pt"))
+        # if eval_loss < best_loss:
+        #     best_loss = eval_loss
+        #     best_dict = {
+        #         "epoch": epochs,
+        #         "train_loss": train_loss,
+        #         "eval_loss": eval_loss,
+        #         "eval_metric": eval_metric.item(),
+        #         "model_state_dict": model.state_dict(),
+        #     }
+        #     torch.save(best_dict, os.path.join(out_dir, "best.pt"))
 
-        # log some informaiton to the console
+        # log some information to the console
         print(
             "Epoch #",
             epoch,
@@ -342,50 +329,25 @@ def train_loop(
         print("Epoch Time:", str(time() - start_time))
 
         # manually save some information for posterity
-        save_stats(out_dir, float(train_loss), "train_loss.txt")
-        save_stats(out_dir, float(eval_loss), "eval_loss.txt")
-        save_stats(out_dir, float(eval_metric.item()), "eval_metric.txt")
+        # save_stats(out_dir, float(train_loss), "train_loss.txt")
+        # save_stats(out_dir, float(eval_loss), "eval_loss.txt")
+        # save_stats(out_dir, float(eval_metric.item()), "eval_metric.txt")
 
-        # push all values to tensorboard session
-        tensorboard_writer.flush()
+        train.report(
+            {
+                "eval_metric": float(eval_metric.item()),
+                "eval_loss": float(eval_loss),
+                "train_loss": float(train_loss),
+            },
+            checkpoint=checkpoint,
+        )
 
-    return {
-        "epoch": epochs,
-        "train_loss": float(train_loss),
-        "eval_loss": float(eval_loss),
-        "eval_metric": float(eval_metric.item()),
-    }
 
-
-# training driver code
-if __name__ == "__main__":
-    # initalize various utilities
-    wandb.login()
-    tensorboard_writer = logging_config()
-
-    args = parse_cli()
-
-    os.makedirs(args.out_dir, exist_ok=True)
-
-    torch.manual_seed(1)
-
+def training_wrapper(search_space):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    run = wandb.init(
-        project="lstm-training",
-        # Track hyperparameters and run metadata
-        config={
-            "learning_rate": args.learning_rate,
-            "weight_decay": args.weight_decay,
-            "batch_size": args.batch_size,
-            "epochs": args.epochs,
-            "out_dir": args.out_dir,
-            "num_workers": args.num_workers,
-            "device": device,
-        },
-    )
 
     row_dim = max(
-        pd.read_parquet(args.parquet_path_test).groupby("obj_index").size().max(),
+        pd.read_parquet(args.parquet_path_val).groupby("obj_index").size().max(),
         pd.read_parquet(args.parquet_path_train).groupby("obj_index").size().max(),
     )
 
@@ -393,24 +355,30 @@ if __name__ == "__main__":
     train_data_loader = create_data_loader(
         parquet_path=args.parquet_path_train,
         row_dim=row_dim,
-        batch_size=args.batch_size,
+        batch_size=search_space["batch_size"],
         is_training=args.is_training,
         num_workers=args.num_workers,
     )
 
-    test_data_loader = create_data_loader(
-        parquet_path=args.parquet_path_test,
+    val_data_loader = create_data_loader(
+        parquet_path=args.parquet_path_val,
         row_dim=row_dim,
-        batch_size=args.batch_size,
+        batch_size=search_space["batch_size"],
         is_training=args.is_training,
         num_workers=args.num_workers,
     )
 
     # log size to console
     print("TRAIN DATALOADER LENGTH:", len(train_data_loader))
-    print("TEST DATALOADER LENGTH:", len(test_data_loader))
+    print("VAL DATALOADER LENGTH:", len(val_data_loader))
 
-    model = model.TimeSeriesClassifier(num_features=6, hidden_size=128, num_layers=2,num_classes=2, dropout_fraction=0.3)
+    model = model_file.TimeSeriesClassifier(
+        num_features=6,
+        num_classes=2,
+        hidden_size=search_space["hidden_size"],
+        num_layers=search_space["num_layers"],
+        dropout_fraction=search_space["dropout"],
+    )
 
     # send model to GPU
     model.to(device=device)
@@ -421,15 +389,16 @@ if __name__ == "__main__":
     # initalize loss function, optimizer, learning-rate scheduler, and task metric
     loss_func = nn.BCELoss()
     optimizer = optim.Adam(
-        params=model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
+        params=model.parameters(),
+        lr=search_space["learning_rate"],
+        weight_decay=search_space["weight_decay"],
     )
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1500, gamma=0.1)
     metric_func = torchmetrics.F1Score(task="multiclass", num_classes=2)
 
-    # execute training
-    results_dict = train_loop(
+    train_loop(
         train_data_loader,
-        test_data_loader,
+        val_data_loader,
         args.epochs,
         model,
         loss_func,
@@ -437,15 +406,68 @@ if __name__ == "__main__":
         args.out_dir,
         scheduler,
         metric_func,
-        tensorboard_writer,
         device,
     )
 
-    # gracefully exit tensorboard
-    tensorboard_writer.close()
 
-    # save final model checkpoint
-    torch.save(
-        {"model_state_dict": model.state_dict(), **results_dict},
-        os.path.join(args.out_dir, "last.pt"),
+# training driver code
+if __name__ == "__main__":
+    # initalize various utilities
+
+    args = parse_cli()
+
+    # search_space = {
+    #     "learning_rate": tune.grid_search([1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
+    #     "weight_decay": tune.choice([1e-5, 1e-4, 1e-3, 1e-2, 1e-1]),
+    #     "batch_size": tune.grid_search([2, 4, 8, 16, 32, 64]),
+    #     "hidden_size": tune.grid_search([128, 256, 512]),
+    #     "num_layers": tune.grid_search([1, 2, 3]),
+    #     "dropout": tune.choice([0.1, 0.2, 0.3, 0.4, 0.5]),
+    # }
+
+    search_space = {
+        "learning_rate": tune.grid_search([1e-3, 1e-2, 1e-1]),
+        "weight_decay": tune.choice([1e-5]),
+        "batch_size": tune.grid_search([32]),
+        "hidden_size": tune.grid_search([128, 256, 512]),
+        "num_layers": tune.grid_search([2, 3]),
+        "dropout": tune.choice([0.3, 0.4, 0.5, 0.6]),
+    }
+
+    # search_space = {
+    #     "learning_rate": tune.grid_search([1e-3, 1e-2]),
+    #     "weight_decay": tune.choice([1e-5]),
+    #     "batch_size": tune.grid_search([32]),
+    #     "hidden_size": tune.grid_search([128, 256]),
+    #     "num_layers": tune.grid_search([2, 3]),
+    #     "dropout": tune.choice([0.5]),
+    # }
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    torch.manual_seed(1)
+    
+    trainable_with_resources = tune.with_resources(training_wrapper, {"cpu": 8, "gpu": 1})
+    # execute training
+    tuner = tune.Tuner(
+        trainable=trainable_with_resources,
+        run_config=train.RunConfig(
+            name=f"lstm_classifier_training",
+            # storage_path=args.out_dir,
+            # callbacks=[],
+            checkpoint_config=train.CheckpointConfig(
+                checkpoint_score_attribute="eval_metric",
+                checkpoint_score_order="max",
+                num_to_keep=5,
+            ),     
+        ),
+        tune_config=tune.TuneConfig(
+            num_samples=1,
+            max_concurrent_trials=1,
+            scheduler=ASHAScheduler(metric="eval_metric", mode="max"),
+        ),
+        
+        param_space=search_space,
     )
+
+    result = tuner.fit()

@@ -57,7 +57,7 @@ Dependencies are managed using [poetry](https://python-poetry.org/). You will ne
 ├── pyproject.toml
 ├── README.md
 └── weights
-    └── best.pt
+    └── model.pth
 
 ```
 
