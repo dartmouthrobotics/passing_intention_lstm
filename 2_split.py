@@ -4,22 +4,14 @@ import numpy as np
 from aux_code.learning_preprocess import get_trajectory_before_pass
 
 
-np.random.seed(0)
+np.random.seed(0)  # TODO check random seed
 
 DATASET_ROOT = "./datasets"
-FULL_DATASET_PARQUET_PATH = os.path.join(
-    DATASET_ROOT, "preprocessed_full_dataset.parquet"
-)
+FULL_DATASET_PARQUET_PATH = os.path.join(DATASET_ROOT, "preprocessed_full_dataset.parquet")
 
-OUT_TRAIN_DATASET_PARQUET_PATH = os.path.join(
-    DATASET_ROOT, "preprocessed_train_dataset.parquet"
-)
-OUT_VAL_DATASET_PARQUET_PATH = os.path.join(
-    DATASET_ROOT, "preprocessed_val_dataset.parquet"
-)
-OUT_TEST_DATASET_PARQUET_PATH = os.path.join(
-    DATASET_ROOT, "preprocessed_test_dataset.parquet"
-)
+OUT_TRAIN_DATASET_PARQUET_PATH = os.path.join(DATASET_ROOT, "preprocessed_train_dataset.parquet")
+OUT_VAL_DATASET_PARQUET_PATH = os.path.join(DATASET_ROOT, "preprocessed_val_dataset.parquet")
+OUT_TEST_DATASET_PARQUET_PATH = os.path.join(DATASET_ROOT, "preprocessed_test_dataset.parquet")
 
 df_entire_pass = pd.read_parquet(FULL_DATASET_PARQUET_PATH)
 

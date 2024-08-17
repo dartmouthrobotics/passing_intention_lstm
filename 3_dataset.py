@@ -60,21 +60,13 @@ class PassingIntentionDataset(Dataset):
 
 if __name__ == "__main__":
     ### Usage example
-    TRAIN_PARQUET_PATH = (
-        "./datasets/preprocessed_train_dataset.parquet"
-    )
-    TEST_PARQUET_PATH = (
-        "./datasets/preprocessed_test_dataset.parquet"
-    )
+    TRAIN_PARQUET_PATH = "./datasets/preprocessed_train_dataset.parquet"
+    TEST_PARQUET_PATH = "./datasets/preprocessed_test_dataset.parquet"
 
     row_dim = max(
         pd.read_parquet(TEST_PARQUET_PATH).groupby("obj_index").size().max(),
         pd.read_parquet(TRAIN_PARQUET_PATH).groupby("obj_index").size().max(),
     )
 
-    train_dataset = PassingIntentionDataset(
-        parquet_path=TRAIN_PARQUET_PATH, row_dim=row_dim
-    )
-    test_dataset = PassingIntentionDataset(
-        parquet_path=TEST_PARQUET_PATH, row_dim=row_dim
-    )
+    train_dataset = PassingIntentionDataset(parquet_path=TRAIN_PARQUET_PATH, row_dim=row_dim)
+    test_dataset = PassingIntentionDataset(parquet_path=TEST_PARQUET_PATH, row_dim=row_dim)
