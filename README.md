@@ -1,18 +1,28 @@
-# Data Generation and Neural Network Training for Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters Paper
+# Data, Data Generation and Neural Network Training for Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters Paper
 
+
+## Abstract
+```
+This paper addresses the obstacle avoidance of Autonomous Surface Vehicles (ASVs) for safe navigation in high-traffic waters while ensuring an active state estimation of obstacle's passing intent and reducing its uncertainty. We introduce a topological modeling of passing intent of obstacles, which can be applied to varying encounter situations based on the inherent embedding of topological concepts in COLREGs. With a Long Short-Term Memory (LSTM) neural network, we classify the passing intent of obstacles. Then, for determining the ASV maneuver, we propose a multi-objective optimization framework including information gain about the passing obstacle intent and safety. We validate the proposed approach under extensive Monte Carlo simulations 2,400 runs with a varying number of obstacles, dynamic properties, encounter situations, and different behavioral patterns of obstacles (cooperative, non-cooperative). We also present the results from a real marine accident case study as well as real-world experiments of a real ASV with environmental disturbances, showing successful collision avoidance with our strategy in real-time.
+```
+
+### Authors
+* Mingi Jeong: mingi.jeong.gr@dartmouth.edu
+* Ari Chadda: achadda@iqt.org
+* Alberto Quattrini Li: aql@dartmouth.edu
+
+### How to cite
+```
+@inproceedings{jeong-2024, author = {Jeong, Mingi and Li, Alberto Quattrini}, booktitle = {2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, title = {Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters}, year = {2024}, volume = {}, number = {}, pages = {}, doi = {}}
+```
+
+## General
 <p align="center">
     <img src="./imgs/fig2-system-architecture.png" width="600">
 </p>
 
-* This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: left or right to your vessel as well as data generator including real-world AIS / synthetic traffic.
+* This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: topological modeling of left or right to your vessel as well as data and data generator including real-world AIS / synthetic traffic.
 * Accepted to `IROS 2024` by Dartmouth Robotics (and non-archival presentation at `MOOS-DAWG'24`)
-* Please cite this paper TODO 
-
-
-## Authors
-* Mingi Jeong
-* Ari Chadda
-* Alberto Quattrini Li
 
 
 ## Successfully Real-World Deployed on an ASV
@@ -94,7 +104,7 @@ poetry shell # create virtualenv
 poetry install # install project dependencies
 python 1_preprocessing.py # prepare data for training
 python 2_split.py # create train/test split
-python python 5_train.py --parquet-path-train <HOME_ABSPATH>/passing_intention_lstm_private/datasets/preprocessed_train_dataset.parquet --parquet-path-val <HOME_ABSPATH>/passing_intention_lstm_private/datasets/preprocessed_val_dataset.parquet --out-dir <HOME_ABSPATH>/passing_intention_lstm_private/passing_intention_model_training/run_2/ --is-training True --num-workers 4 --epochs 500
+python 5_train.py --parquet-path-train <HOME_ABSPATH>/passing_intention_lstm_private/datasets/preprocessed_train_dataset.parquet --parquet-path-val <HOME_ABSPATH>/passing_intention_lstm_private/datasets/preprocessed_val_dataset.parquet --out-dir <HOME_ABSPATH>/passing_intention_lstm_private/passing_intention_model_training/run_2/ --is-training True --num-workers 4 --epochs 500
 python 6_eval.py # evaluate results
 ```
 

@@ -2,6 +2,7 @@
 import os
 import sys
 import argparse
+import yaml
 from typing import Any, Tuple, Union, Dict
 
 # logging utilities
@@ -17,7 +18,7 @@ import numpy.typing as npt
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
-from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 # modeling
 import torchmetrics
@@ -28,6 +29,18 @@ import torch.optim as optim
 dataset = __import__("3_dataset")
 model = __import__("4_model")
 
+CONFIG_PATH = "./param/lstm_config.yaml"
+
+with open(CONFIG_PATH, 'r') as file:
+    config = yaml.safe_load(file)
+OBSERVATION_LENGTH = config['OBSERVATION_LENGTH']
+num_features_ = config['num_features']
+num_classes_ = config['num_classes']
+hidden_size_ = config['hidden_size']
+num_layers_ = config['num_layers']
+dropout_fraction_ = config['dropout_fraction']
+step_size_ = config['step_size']
+gamma_ = config['gamma']
 
 def logging_config() -> SummaryWriter:
     """initialize logging
@@ -60,6 +73,12 @@ def parse_cli() -> argparse.Namespace:
         type=str,
         default="",
         help="path to directory of train data assets",
+    )
+    parser.add_argument(
+        "--parquet-path-val",
+        type=str,
+        default="",
+        help="path to directory of validation data assets",
     )
     parser.add_argument(
         "--parquet-path-test",
@@ -177,25 +196,35 @@ def train_epoch(
     loss_ls = []
     # load feature-label pairs into memory
     for X, y, l in train_data_loader:
+
         # send to GPU
-        X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
+        # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
+
         # reset gradients
         optimizer.zero_grad()
+
         # perform forward pass
         logits = model(X)
+        # print("logits pack", logits, logits.shape)
+
         # evaluate loss + compute gradients
         loss = loss_func(logits, y)
+
         # log loss value
         tensorboard_writer.add_scalar("Loss/train", loss, epoch)
         wandb.log({"Loss/train": loss})
+
         # backpropogate
         loss.backward()
+
         # step in computed direction + step size in loss landscape
         optimizer.step()
+
         # save loss for logging
         loss = loss.mean()
         loss_ls.append(loss.item())
+
     return np.vstack(loss_ls).mean()
 
 
@@ -231,23 +260,32 @@ def eval_func(
     loss_ls = []
     # load feature-label pairs into memory
     for X, y, l in test_data_loader:
+
         # send to GPU
-        X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
+        # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
+
         # get model guess
         logits = model(X)
+
         # post-process guess
-        _, preds_ = torch.max(logits, 1)
-        _, gt_ = torch.max(y, 1)
+        softmax_ = nn.Softmax(dim=1)
+        softmax_logits_ = softmax_(logits)
+        _, preds_ = torch.max(softmax_logits_, 1) 
+        _, gt_ = torch.max(y, 1) 
+
         # compute evaluation loss to compare with training loss
         loss = loss_func(logits, y)
+
         # log loss value
         tensorboard_writer.add_scalar("Loss/val", loss, epoch)
         wandb.log({"Loss/val": loss})
+
         # save guesses and loss values
         loss_ls.append(loss)
         preds.append(preds_.type(torch.int16).cpu())
         gt.append(gt_.type(torch.int16).cpu())
+
     # compute task performace metric
     metric = metric_func(torch.cat(preds), torch.cat(gt))
     # log task performance metric
@@ -359,6 +397,7 @@ def train_loop(
 
 # training driver code
 if __name__ == "__main__":
+    # --------------------------------------------------
     # initalize various utilities
     wandb.login()
     tensorboard_writer = logging_config()
@@ -384,11 +423,15 @@ if __name__ == "__main__":
         },
     )
 
-    row_dim = max(
-        pd.read_parquet(args.parquet_path_test).groupby("obj_index").size().max(),
-        pd.read_parquet(args.parquet_path_train).groupby("obj_index").size().max(),
-    )
+    # row_dim = max(
+    #     pd.read_parquet(args.parquet_path_val).groupby("obj_index").size().max(),
+    #     pd.read_parquet(args.parquet_path_train).groupby("obj_index").size().max(),
+    # )
 
+    row_dim = OBSERVATION_LENGTH
+    # --------------------------------------------------
+
+    # --------------------------------------------------
     # create DataLoaders
     train_data_loader = create_data_loader(
         parquet_path=args.parquet_path_train,
@@ -399,18 +442,24 @@ if __name__ == "__main__":
     )
 
     test_data_loader = create_data_loader(
-        parquet_path=args.parquet_path_test,
+        parquet_path=args.parquet_path_val,
         row_dim=row_dim,
         batch_size=args.batch_size,
         is_training=args.is_training,
         num_workers=args.num_workers,
     )
+    # --------------------------------------------------
 
+    # --------------------------------------------------
     # log size to console
     print("TRAIN DATALOADER LENGTH:", len(train_data_loader))
     print("TEST DATALOADER LENGTH:", len(test_data_loader))
 
-    model = model.TimeSeriesClassifier(num_features=6, hidden_size=128, num_layers=2,num_classes=2, dropout_fraction=0.3)
+    model = model.TimeSeriesClassifier(num_features=num_features_, 
+                                       hidden_size=hidden_size_, 
+                                       num_layers=num_layers_,
+                                       num_classes=num_classes_, 
+                                       dropout_fraction=dropout_fraction_)
 
     # send model to GPU
     model.to(device=device)
@@ -419,12 +468,17 @@ if __name__ == "__main__":
     print("MODEL SIZE:", sum(p.numel() for p in model.parameters()), "parameters")
 
     # initalize loss function, optimizer, learning-rate scheduler, and task metric
-    loss_func = nn.BCELoss()
+    # https://stackoverflow.com/questions/55675345/should-i-use-softmax-as-output-when-using-cross-entropy-loss-in-pytorch
+    loss_func = nn.CrossEntropyLoss() # length 2 array output for L,R by model -> this loss contains already softmax
     optimizer = optim.Adam(
         params=model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
     )
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
-    metric_func = torchmetrics.F1Score(task="multiclass", num_classes=2)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 
+                                          step_size=step_size_, 
+                                          gamma=gamma_)
+    metric_func = torchmetrics.F1Score(task="multiclass", 
+                                       num_classes=num_classes_)
+    # --------------------------------------------------
 
     # execute training
     results_dict = train_loop(

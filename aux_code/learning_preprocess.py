@@ -3,6 +3,25 @@ import pandas as pd
 import math
 
 
+def get_heading_converted(input_df):
+    """
+    input_df has 'Heading' with NED frame [0,360)
+    Args: 
+    - input_df (DataFrame)
+
+    Returns:
+    - input_df with 'heading converted 
+    """
+    if 'heading_converted' in input_df.columns:
+        return input_df
+    else:
+        input_df['heading_converted']  = np.deg2rad(input_df['Heading'])
+        # lambda function method: very fast! 
+        # https://stackoverflow.com/questions/71249186/applying-function-to-column-in-a-dataframe
+        input_df['heading_converted'] = input_df['heading_converted'].apply(convert_from_NED_to_Robotic)
+
+        return input_df
+
 def convert_from_NED_to_Robotic(angle):
     """
     convert radian angle based on NED frame to radian angle based on the robotics frame

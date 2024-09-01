@@ -2,6 +2,7 @@
 import os
 import sys
 import argparse
+import yaml
 from typing import Any, Tuple, Union, Dict
 
 # logging utilities
@@ -32,6 +33,13 @@ from ray.tune.schedulers import ASHAScheduler
 dataset = __import__("3_dataset")
 model_file = __import__("4_model")
 
+CONFIG_PATH = "./param/lstm_config.yaml"
+
+with open(CONFIG_PATH, 'r') as file:
+    config = yaml.safe_load(file)
+OBSERVATION_LENGTH = config['OBSERVATION_LENGTH']
+num_features_ = config['num_features']
+num_classes_ = config['num_classes']
 
 def parse_cli() -> argparse.Namespace:
     """command line interface parser to simplify model training kickoff
@@ -152,22 +160,30 @@ def train_epoch(
     loss_ls = []
     # load feature-label pairs into memory
     for X, y, l in tqdm(train_data_loader, colour="green"):
+
         # send to GPU
-        X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
+        # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
+
         # reset gradients
         optimizer.zero_grad()
+
         # perform forward pass
         logits = model(X)
+
         # evaluate loss + compute gradients
         loss = loss_func(logits, y)
+
         # backpropogate
         loss.backward()
+
         # step in computed direction + step size in loss landscape
         optimizer.step()
+
         # save loss for logging
         loss = loss.mean()
         loss_ls.append(loss.item())
+
     agg_loss = np.vstack(loss_ls).mean()
     tensorboard_writer.add_scalar("Loss/train", agg_loss, epoch)
     return agg_loss
@@ -204,21 +220,29 @@ def eval_func(
     loss_ls = []
     # load feature-label pairs into memory
     for X, y, l in tqdm(val_data_loader, colour="red"):
+
         # send to GPU
-        X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
+        # X = pack_padded_sequence(X, lengths=l, batch_first=True, enforce_sorted=False)
         X, y = X.to(device=device), y.to(device=device)
+        
         # get model guess
         logits = model(X)
+        
         # post-process guess
-        _, preds_ = torch.max(logits, 1)
+        softmax_ = nn.Softmax(dim=1)
+        softmax_logits_ = softmax_(logits)
+        _, preds_ = torch.max(softmax_logits_, 1)
         _, gt_ = torch.max(y, 1)
+
         # compute evaluation loss to compare with training loss
         loss = loss_func(logits, y)
+
         # log loss value
         # save guesses and loss values
         loss_ls.append(loss)
         preds.append(preds_.type(torch.int16).cpu())
         gt.append(gt_.type(torch.int16).cpu())
+
     # compute task performace metric
     metric = metric_func(torch.cat(preds), torch.cat(gt))
     # log task performance metric
@@ -346,11 +370,13 @@ def train_loop(
 def training_wrapper(search_space):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    row_dim = max(
-        pd.read_parquet(args.parquet_path_val).groupby("obj_index").size().max(),
-        pd.read_parquet(args.parquet_path_train).groupby("obj_index").size().max(),
-    )
+    # row_dim = max(
+    #     pd.read_parquet(args.parquet_path_val).groupby("obj_index").size().max(),
+    #     pd.read_parquet(args.parquet_path_train).groupby("obj_index").size().max(),
+    # )
 
+    row_dim = OBSERVATION_LENGTH
+    # --------------------------------------------------
     # create DataLoaders
     train_data_loader = create_data_loader(
         parquet_path=args.parquet_path_train,
@@ -372,14 +398,16 @@ def training_wrapper(search_space):
     print("TRAIN DATALOADER LENGTH:", len(train_data_loader))
     print("VAL DATALOADER LENGTH:", len(val_data_loader))
 
+    # --------------------------------------------------
     model = model_file.TimeSeriesClassifier(
-        num_features=6,
-        num_classes=2,
+        num_features=num_features_,
+        num_classes=num_classes_,
         hidden_size=search_space["hidden_size"],
         num_layers=search_space["num_layers"],
         dropout_fraction=search_space["dropout"],
     )
 
+    # --------------------------------------------------
     # send model to GPU
     model.to(device=device)
 
@@ -387,7 +415,8 @@ def training_wrapper(search_space):
     print("MODEL SIZE:", sum(p.numel() for p in model.parameters()), "parameters")
 
     # initalize loss function, optimizer, learning-rate scheduler, and task metric
-    loss_func = nn.BCELoss()
+    # https://stackoverflow.com/questions/55675345/should-i-use-softmax-as-output-when-using-cross-entropy-loss-in-pytorch
+    loss_func = nn.CrossEntropyLoss() # length 2 array output for L,R by model -> this loss contains already softmax
     optimizer = optim.Adam(
         params=model.parameters(),
         lr=search_space["learning_rate"],
@@ -396,6 +425,7 @@ def training_wrapper(search_space):
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1500, gamma=0.1)
     metric_func = torchmetrics.F1Score(task="multiclass", num_classes=2)
 
+    # --------------------------------------------------
     train_loop(
         train_data_loader,
         val_data_loader,

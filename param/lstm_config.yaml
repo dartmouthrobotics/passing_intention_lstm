@@ -1,0 +1,41 @@
+REAL_DATA_SENSOR_RANGE: 3000  # m
+SYNTHETIC_DATA_SENSOR_RANGE: 100  # m
+# Data size
+REAL_DATA_SIZE: 200  # ea
+SYNTHETIC_DATA_SIZE: 1000  # ea
+# normalization
+NORM_COLUMN_NAMES_LS:
+  - "x"
+  - "y"
+  - "rel_dist"
+
+# split specification
+TRAIN_RATIO: 0.7
+VAL_RATIO: 0.2
+OBSERVATION_LENGTH: 10 # expiry message after 10 ea(sec)
+
+# model specifics
+X_COLS: [
+    "x", 
+    "y",
+    "rel_dist",
+    # "heading_converted",
+    "sin_heading_converted",
+    "cos_heading_converted",
+    "sin_rel_bearing",
+    "cos_rel_bearing",
+]
+Y_COLS: ["label"]
+LABELS: ["L", "R"]
+CLASSES_DICT: {"L": 0, "R": 1}
+
+# Model specific
+num_features: 7 # ensure same as X_COL length
+num_classes: 2 # multi class classification problem (can be 1 and regression problem too)
+hidden_size: 128
+num_layers: 2
+dropout_fraction: 0.3
+
+# hyper parameters
+step_size: 1000 # lr_scheduler
+gamma: 0.1 # lr_scheduler
