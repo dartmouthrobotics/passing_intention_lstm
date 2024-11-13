@@ -15,7 +15,8 @@ model_ = __import__("4_model")
 # MODEL_PATH = "./weights/feature7_obs_len_5_layer_2.pt"
 # MODEL_PATH = "./weights/feature7_obs_len_10_layer_3.pt" # (128, 3, 10 len, 7 feature)
 # MODEL_PATH = "./weights/len10-raytune.pth" 
-MODEL_PATH = "./weights/len10-128.pt" # Using len10-128
+# MODEL_PATH = "./weights/len10-128.pt" # my own stop
+MODEL_PATH = "./weights/ray-10-128.pth" # raytune result
 # MODEL_PATH = "./weights/model.pth"
 TRAIN_PARQUET_PATH = "./datasets/preprocessed_train_dataset.parquet"
 TEST_PARQUET_PATH = "./datasets/preprocessed_test_dataset.parquet"
@@ -46,8 +47,8 @@ model = model_.TimeSeriesClassifier(num_features=num_features_,
 checkpoint = torch.load(MODEL_PATH)
 for key in checkpoint:
     print(key)
-model.load_state_dict(torch.load(MODEL_PATH)['model_state_dict']) # .pt 
-# model.load_state_dict(torch.load(MODEL_PATH)) # pth
+# model.load_state_dict(torch.load(MODEL_PATH)['model_state_dict']) # .pt 
+model.load_state_dict(torch.load(MODEL_PATH)) # pth
 
 
 

@@ -68,9 +68,10 @@ class PassingIntentionDataset(Dataset):
 if __name__ == "__main__":
     ### Usage example
     TRAIN_PARQUET_PATH = "./datasets/preprocessed_train_dataset.parquet"
+    VAL_PARQUET_PATH = "./datasets/preprocessed_val_dataset.parquet"
     TEST_PARQUET_PATH = "./datasets/preprocessed_test_dataset.parquet"
 
-    # no need for fixed observation length
+    # no need if we use fixed observation length (matching ros length)
     # row_dim = max(
     #     pd.read_parquet(TEST_PARQUET_PATH).groupby("obj_index").size().max(),
     #     pd.read_parquet(TRAIN_PARQUET_PATH).groupby("obj_index").size().max(),
@@ -80,4 +81,37 @@ if __name__ == "__main__":
 
     train_dataset = PassingIntentionDataset(parquet_path=TRAIN_PARQUET_PATH, row_dim=row_dim)
     test_dataset = PassingIntentionDataset(parquet_path=TEST_PARQUET_PATH, row_dim=row_dim)
-    
+    val_dataset = PassingIntentionDataset(parquet_path=VAL_PARQUET_PATH, row_dim=row_dim)
+
+
+    #### Data size check (batch size 1)
+    from torch.utils.data import DataLoader
+
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+        drop_last=False,
+    )
+
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+        drop_last=False,
+    )
+
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+        drop_last=False,
+    )
+
+    # log size to console
+    print("TRAIN DATALOADER LENGTH:", len(train_dataloader))
+    print("TEST DATALOADER LENGTH:", len(test_dataloader))
+    print("VAL DATALOADER LENGTH:", len(val_dataloader))
