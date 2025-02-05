@@ -1,16 +1,28 @@
-# Neural Network Training for Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters Paper
+# Data, Data Generation and Neural Network Training for Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters Paper
 
+
+## Abstract
+```
+This paper addresses the obstacle avoidance of Autonomous Surface Vehicles (ASVs) for safe navigation in high-traffic waters while ensuring an active state estimation of obstacle's passing intent and reducing its uncertainty. We introduce a topological modeling of passing intent of obstacles, which can be applied to varying encounter situations based on the inherent embedding of topological concepts in COLREGs. With a Long Short-Term Memory (LSTM) neural network, we classify the passing intent of obstacles. Then, for determining the ASV maneuver, we propose a multi-objective optimization framework including information gain about the passing obstacle intent and safety. We validate the proposed approach under extensive Monte Carlo simulations 2,400 runs with a varying number of obstacles, dynamic properties, encounter situations, and different behavioral patterns of obstacles (cooperative, non-cooperative). We also present the results from a real marine accident case study as well as real-world experiments of a real ASV with environmental disturbances, showing successful collision avoidance with our strategy in real-time.
+```
+
+### Authors
+* Mingi Jeong: mingi.jeong.gr@dartmouth.edu
+* Ari Chadda: achadda@iqt.org
+* Alberto Quattrini Li: aql@dartmouth.edu
+
+### How to cite
+```
+@inproceedings{jeong-2024, author = {Jeong, Mingi and Li, Alberto Quattrini}, booktitle = {2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, title = {Active Learning-augmented Intent-aware Obstacle Avoidance of Autonomous Surface Vehicles in High-traffic Waters}, year = {2024}, volume = {}, number = {}, pages = {}, doi = {}}
+```
+
+## General
 <p align="center">
     <img src="./imgs/fig2-system-architecture.png" width="600">
 </p>
 
-* This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: left or right to your vessel as well as data generator including real-world AIS / synthetic traffic.
-* Submitted to `IROS 2024` by Dartmouth Robotics
-
-## Contributors
-* Ari Chadda
-* Mingi Jeong
-* Alberto Quattrini Li
+* This repository contains the code for our LSTM-backbone neural network training to predict the side a vessel will pass: topological modeling of left or right to your vessel as well as data and data generator including real-world AIS / synthetic traffic.
+* Accepted to `IROS 2024` by Dartmouth Robotics (and non-archival presentation at `MOOS-DAWG'24`)
 
 
 ## Successfully Real-World Deployed on an ASV
@@ -47,6 +59,7 @@ Dependencies are managed using [poetry](https://python-poetry.org/). You will ne
 │   ├── extracted_data
 │   ├── preprocessed_full_dataset.parquet
 │   ├── preprocessed_test_dataset.parquet
+|   ├── preprocessed_val_dataset.parquet
 │   ├── preprocessed_train_dataset.parquet
 │   └── synthetic_data
 ├── notebooks
@@ -56,7 +69,7 @@ Dependencies are managed using [poetry](https://python-poetry.org/). You will ne
 ├── pyproject.toml
 ├── README.md
 └── weights
-    └── best.pt
+    └── model.pth
 
 ```
 
@@ -80,7 +93,9 @@ flowchart TD
     train(5_train.py) --> eval(6_eval.py)
 ```
 
-To run, please use the following commands from the root of this repository
+To run, please use the following commands from the root of this repository.
+
+Then, replace the `MODEL_PATH` constant in the `6_eval.py` script and update the `TimeSeriesClassifier()` definition if appropriate. 
 
 ```bash
 poetry shell # create virtualenv
@@ -103,4 +118,4 @@ python 6_eval.py # evaluate results
     <img src="./imgs/new-beauty-ours.png" width="600">
 </p>
 
-From time $t$ to $t+1$, controlled ASV, $R$'s collision avoidance behavior by state-of-the-art method vs.\ proposed method using active learning-augmented intent-awareness under an uncertain scenario where an obstacle, $O$ approaches from the left side of $R$: (\textbf{a}) At $t$, the state-of-the-art, lacking intent-awareness, predicts that O will pass on the left side (red) of $R$ and thus $R$ maintains its course as a \textit{stand-on} vessel. At $t+1$, $R$ realizes $O$ is attempting to pass on the right side (green) of $R$, resulting in a nearmiss. $R$ did a hard turn-over but it is too late. (\textbf{b}) At $t$, our method classifies the topological passing side based on the historical data from $t_h$ to $t$ and actively determines an action to increase information gain, i.e., to decrease the probability of passing on the right side (green), which is risky due to bow crossing. This proactive action with \textit{good seamanship} despite a \textit{stand-on} status leads to a safe clearance at $t+1$.
+From time $t$ to $t+1$, controlled ASV, $R$'s collision avoidance behavior by state-of-the-art method vs.\ proposed method using active learning-augmented intent-awareness under an uncertain scenario where an obstacle, $O$ approaches from the left side of $R$: (**a**) At $t$, the state-of-the-art, lacking intent-awareness, predicts that O will pass on the left side (red) of $R$ and thus $R$ maintains its course as a *stand-on* vessel. At $t+1$, $R$ realizes $O$ is attempting to pass on the right side (green) of $R$, resulting in a nearmiss. $R$ did a hard turn-over but it is too late. (**b**) At $t$, our method classifies the topological passing side based on the historical data from $t_h$ to $t$ and actively determines an action to increase information gain, i.e., to decrease the probability of passing on the right side (green), which is risky due to bow crossing. This proactive action with *good seamanship* despite a *stand-on* status leads to a safe clearance at $t+1$.

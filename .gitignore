@@ -64,8 +64,19 @@ CATKIN_IGNORE
 *csv
 
 # weight file
+<<<<<<< HEAD
 *.pth
 *.zip
 
 # jupyter
 .ipynb_checkpoints/
+=======
+*.zip
+
+# jupyter
+.ipynb_checkpoints/
+
+# training 
+*.log
+test.py
+>>>>>>> remotes/private/main
